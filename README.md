@@ -4,8 +4,6 @@
 
 Recurrent surface tracking and deterministic virtual-unwrapping exports for the Vesuvius Challenge.
 
-> **Current Status (PHerc0332):** Segmenting — 2 segments identified, validating with team on text/ink.
-
 ## Overview
 
 This toolkit predicts local 3D surface continuation, confidence, and uncertainty. Its authoritative output is an XYZ surface map (`[H,W,3]`), not a PNG. The renderer uses that map to sample a CT volume along surface normals and optionally runs a TorchScript ink model.
