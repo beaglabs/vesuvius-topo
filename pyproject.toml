@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vesuvius-ssm"
+version = "0.1.0"
+description = "Recurrent surface tracking and virtual unwrapping for Vesuvius CT volumes"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "fsspec>=2024.6",
+  "numpy>=1.26",
+  "pillow>=10",
+  "s3fs>=2024.6",
+  "scipy>=1.12",
+  "tifffile>=2024.5",
+  "torch>=2.3",
+  "zarr>=2.18,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+marimo = ["marimo>=0.14"]
+mesh = [
+  "libigl>=2.6.1",
+  "scikit-image>=0.25",
+  "trimesh>=4.7",
+]
+
+[project.scripts]
+vesuvius-ssm = "vesuvius_ssm.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vesuvius_ssm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
