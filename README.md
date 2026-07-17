@@ -24,7 +24,7 @@ Builds a dense grid mesh directly from the probability field using PCA projectio
 6. **Builds** a triangle mesh from the valid grid, selecting the seed's connected component
 7. **Rasterizes** the mesh using natural grid UV coordinates for reliable texturing
 
-Because UV coordinates derive from the grid structure, triangles never fold or invert—making this method ideal for initial exploration and large-area coverage.
+Because UV coordinates derive from the grid structure, triangles avoid folding and inversion, making this method ideal for initial exploration and large-area coverage.
 
 ### Topology-Aware Unwrap (`topology-unwrap`)
 
@@ -36,15 +36,6 @@ Extracts the probability ridge as a triangle mesh and flattens it with conformal
 4. **Selects** a geodesic disk around the seed, automatically filling inner boundary loops
 5. **Initializes** UV coordinates harmonically (LSCM fallback) and refines them with SLIM
 6. **Rejects** mixed-sign UV triangles instead of rasterizing folds
-
-This approach produces higher-fidelity parameterization suitable for production-quality unwrappings where metric accuracy matters.
-
-### Rendered Surfaces
-
-| Candidate 244 | Candidate 472 |
-|:---:|:---:|
-| ![Mesh Unwrap Candidate 244](ink_renders/mesh_unwrap_cand244.png) | ![Mesh Unwrap Candidate 472](ink_renders/mesh_unwrap_cand472.png) |
-| High-adherence surface with low fold/jump rates | Another successfully unwrapped region showing sheet structure |
 
 ---
 
