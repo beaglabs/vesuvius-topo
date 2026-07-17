@@ -153,6 +153,49 @@ vesuvius-ssm render \
 
 The renderer defaults to the public PHerc0332 `20251211183505-2.399um-0.2m-78keV-masked.zarr` CT volume. It writes `surface_layers.tif`, `unwrapped_ct.tif`, `unwrapped_ct.png`, `confidence.png`, and `surface.ply`, reading only the CT bounding box required by the completed surface.
 
+## TIF XYZ Export
+
+Export the surface grid as multi-channel TIF files for downstream processing. The `mesh-unwrap` or `topology-unwrap` output (`.npz`) contains `xyz`, `normals`, `confidence`, and `valid` arrays. Convert these to TIF:
+
+```python
+import numpy as np
+import tifffile
+
+data = np.load("artifacts/mesh-surface.npz")
+xyz = data["xyz"].astype(np.float32)          # [H,W,3] CT level-0 coordinates (NaN outside sheet)
+normals = data["normals"].astype(np.float32)   # [H,W,3] surface normals (NaN outside sheet)
+confidence = data["confidence"].astype(np.float32)  # [H,W] per-pixel confidence
+valid = data["valid"]                          # [H,W] boolean mask
+
+# NaN → 0 for TIF export (NaN breaks most viewers)
+tifffile.imwrite("artifacts/surface_xyz.tif", np.nan_to_num(xyz, nan=0.0), compression="zlib")
+tifffile.imwrite("artifacts/surface_normals.tif", np.nan_to_num(normals, nan=0.0), compression="zlib")
+tifffile.imwrite("artifacts/surface_confidence.tif", np.nan_to_num(confidence, nan=0.0), compression="zlib")
+tifffile.imwrite("artifacts/surface_valid.tif", (valid * 255).astype(np.uint8), compression="zlib")
+
+# Combined XYZ + confidence + valid (5 channels)
+combined = np.concatenate([
+    np.nan_to_num(xyz, nan=0.0),
+    np.nan_to_num(confidence, nan=0.0)[..., None],
+    valid[..., None].astype(np.float32),
+], axis=-1)
+tifffile.imwrite("artifacts/surface_xyz_confidence_valid.tif", combined, compression="zlib")
+```
+
+Produced TIF files:
+
+| File | Shape | Dtype | Description |
+|:---|:---|:---|:---|
+| `surface_xyz.tif` | `[H,W,3]` | float32 | XYZ coordinates in CT level-0 voxels (0 outside sheet) |
+| `surface_normals.tif` | `[H,W,3]` | float32 | Unit surface normals (0 outside sheet) |
+| `surface_confidence.tif` | `[H,W]` | float32 | Per-pixel confidence (0–1) |
+| `surface_valid.tif` | `[H,W]` | uint8 | Binary mask (255 = valid surface pixel) |
+| `surface_xyz_confidence_valid.tif` | `[H,W,5]` | float32 | XYZ + confidence + valid mask packed |
+
+The `.npz` stores NaN for invalid pixels (outside the papyrus sheet). Always use `np.nan_to_num(..., nan=0.0)` before writing TIF — NaN breaks most image viewers and downstream consumers. The `surface_valid.tif` mask distinguishes genuine zeros from missing data.
+
+The `render` command additionally produces `surface_layers.tif` (CT stack sampled along normals) and `unwrapped_ct.tif` (center layer). Pixels outside the valid surface mask are zero-filled.
+
 ## Paris 4 Labeled Benchmark
 
 An end-to-end validation of the render pass and ink pipeline against published ground truth: the labeled PHerc. Paris 4 tutorial segment `w00_20231016151002` (geometry, ink labels, and supervision mask from the `scrollprize` HF bucket). Unlike the PHerc0332 search volume, this segment ships its own 65-layer surface volume (`w00_20231016151002.zarr`, OME multiscale levels 0–5, canvas 32249×51380 exactly matching the labels), so no full-scroll sampling is needed.
