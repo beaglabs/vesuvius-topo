@@ -39,17 +39,16 @@ Extracts the probability ridge as a triangle mesh and flattens it with conformal
 
 This approach produces higher-fidelity parameterization suitable for production-quality unwrappings where metric accuracy matters.
 
-## Rendered Surfaces
+### Rendered Surfaces
 
-![Mesh Unwrap Candidate 244](ink_renders/mesh_unwrap_cand244.png)
-*Candidate 244: High-adherence surface with low fold/jump rates*
-
-![Mesh Unwrap Candidate 472](ink_renders/mesh_unwrap_cand472.png)
-*Candidate 472: Another successfully unwrapped region showing sheet structure*
+| Candidate 244 | Candidate 472 |
+|:---:|:---:|
+| ![Mesh Unwrap Candidate 244](ink_renders/mesh_unwrap_cand244.png) | ![Mesh Unwrap Candidate 472](ink_renders/mesh_unwrap_cand472.png) |
+| High-adherence surface with low fold/jump rates | Another successfully unwrapped region showing sheet structure |
 
 ---
 
-## Install
+## Usage
 
 ```bash
 python -m venv .venv
@@ -165,7 +164,7 @@ The renderer defaults to the public PHerc0332 `20251211183505-2.399um-0.2m-78keV
 
 ## Ink Adapter
 
-Ink inference is optional and expects a TorchScript model accepting Villa's native `[B,1,D,H,W]` tensor. Supply a JSON manifest:
+Ink inference expects a TorchScript model accepting Villa's native `[B,1,D,H,W]` tensor. Supply a JSON manifest:
 
 ```json
 {
