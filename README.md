@@ -162,6 +162,69 @@ vesuvius-ssm render \
 
 The renderer defaults to the public PHerc0332 `20251211183505-2.399um-0.2m-78keV-masked.zarr` CT volume. It writes `surface_layers.tif`, `unwrapped_ct.tif`, `unwrapped_ct.png`, `confidence.png`, and `surface.ply`, reading only the CT bounding box required by the completed surface.
 
+## Paris 4 Labeled Benchmark
+
+An end-to-end validation of the render pass and ink pipeline against published ground truth: the labeled PHerc. Paris 4 tutorial segment `w00_20231016151002` (geometry, ink labels, and supervision mask from the `scrollprize` HF bucket). Unlike the PHerc0332 search volume, this segment ships its own 65-layer surface volume (`w00_20231016151002.zarr`, OME multiscale levels 0–5, canvas 32249×51380 exactly matching the labels), so no full-scroll sampling is needed.
+
+### Surface-Traced Renders
+
+The flattening pass traces the sheet through each depth column of a raw CT slab instead of projecting a fixed tangent plane:
+
+1. **Argmax** of a spatially smoothed depth profile per column
+2. **Sub-voxel parabolic refinement** of the peak position
+3. **Median + gaussian regularization** of the depth map
+4. **Albedo interpolation** from the *raw* slab at the traced surface, so ink contrast is not blurred by the tracing smoothing
+
+Six 1024×1024 level-1 regions were rendered — three ink-rich, three low-ink controls (every supervised block in this segment contains some ink, so the control is relative) — with the published labels overlaid as ground truth:
+
+![Paris 4 benchmark gallery — traced renders vs published ink labels](ink_renders/p4_benchmark/p4_benchmark_gallery.jpg)
+
+Per-region panels (albedo @ surface, albedo+CLAHE, slab max ±2, dark residual, GT labels, overlay) live in `ink_renders/p4_benchmark/` (`r0`–`r5`).
+
+### GP TimeSformer Model Contract
+
+Scoring with the Grand Prize TimeSformer (`timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt`, from the [GP repo](https://github.com/younader/Vesuvius-Grandprize-Winner)'s Drive link) initially returned **chance-level** scores (AUROC ≈ 0.49). The failure was not labels, resolution, or registration — it was the model contract, verified against the GP training/inference code:
+
+| Contract detail | Value | Consequence if wrong |
+|:---|:---|:---|
+| Depth frames | 26 (not 30), `timesformer-pytorch==0.3.3` API `[B,F,C,H,W]` | shape errors / silent distribution shift |
+| Depth window | **fixed** layers 17–42 | per-tile argmax centering *hurts*: AUROC 0.78 vs 0.87 |
+| Depth order | **reversed** for this segment family (predecessor `20231016151000` is on the GP reverse list) | AUROC 0.43 → **0.87** |
+| Preprocessing | clip at 200, divide by 255, native level-0 resolution | mild degradation |
+| Output | 4×4 logit grid → sigmoid → mean | — |
+
+### Scoring Results
+
+64×64 tiles, stride 32, at native level-0 resolution. Positives: supervised tiles with ≥30% ink; negatives: supervised tiles with zero ink. Overall **AUROC 0.778** (4,439 pos / 10,052 neg), mean score 0.66 ink vs 0.39 no-ink.
+
+| Region | Kind | AUROC | no-ink ≥0.5 | no-ink ≥0.9 |
+|:---|:---|---:|---:|---:|
+| r0 y2048 x17408 | ink | 0.786 | 23.1% | 0.9% |
+| r1 y6144 x15360 | ink | 0.856 | 25.4% | 0.6% |
+| r2 y2048 x9216 | ink | 0.627 | 47.9% | 3.0% |
+| r3 y8192 x1024 | low-ink | 0.776 | 38.7% | 0.1% |
+| r4 y6144 x10240 | low-ink | 0.813 | 28.2% | 0.8% |
+| r5 y3072 x12288 | low-ink | 0.810 | 20.3% | 0.7% |
+| **Overall** | | **0.778** | **30.5%** | **0.96%** |
+
+![Score histograms — ink vs no-ink tiles](ink_renders/p4_benchmark/p4_scoring_hist_l0.jpg)
+
+Tile-level AUROC understates the model: solid-blob labels mean "ink tiles" include non-ink pixels, and "no-ink" tiles include unlabeled strokes. The high-confidence tail is the cleaner signal.
+
+### Crack-Firing Analysis
+
+The benchmark's motivation: how often does the model fire on cracks and texture instead of ink?
+
+- **30.5%** of no-ink tiles score ≥0.5 — the model fires *weakly* on texture almost everywhere (the flat tail in the histogram)
+- Only **0.96%** score ≥0.9 — *confident* false firing is rare and concentrated (region r2: 3.0%, also the weakest AUROC)
+- Firing is only modestly higher within 128 px of labeled ink than far from it (e.g. r5: 27.9% vs 18.5%), so label dilation explains little of it
+
+The top false-firing suspects fall into three buckets: horizontal **layer-boundary/crack bands** (genuine crack-firing), dark curvilinear marks that are **likely unlabeled ink** (label noise inflating the apparent rate), and plain dark blotches:
+
+![Top crack-firing suspects — highest scores on no-ink tiles](ink_renders/p4_benchmark/p4_crack_suspects_l0.jpg)
+
+Full machine-readable stats: `ink_renders/p4_benchmark/p4_benchmark_summary.json`. Score maps per region are saved as `.npy` for threshold sweeps.
+
 ## Ink Adapter
 
 Ink inference expects a TorchScript model accepting Villa's native `[B,1,D,H,W]` tensor. Supply a JSON manifest:
@@ -186,4 +249,4 @@ vesuvius-ssm render \
   --output artifacts/render
 ```
 
-The Villa checkpoint must be exported with its exact architecture first. The manifest deliberately makes depth, depth direction, spatial tile size, and preprocessing explicit because these differ between the legacy TimeSformer and newer ResNet3D checkpoints.
+The Villa checkpoint must be exported with its exact architecture first. The manifest deliberately makes depth, depth direction, spatial tile size, and preprocessing explicit because these differ between the legacy TimeSformer and newer ResNet3D checkpoints. Depth direction also differs between *segment families*: scoring the Paris 4 tutorial segment with the wrong depth order drops the GP TimeSformer to chance-level AUROC (see [Paris 4 Labeled Benchmark](#paris-4-labeled-benchmark)).

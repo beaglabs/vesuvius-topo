@@ -1,0 +1,41 @@
+{
+  "benchmark": "PHerc. Paris 4 tutorial segment w00_20231016151002, GP TimeSformer (timesformer_wild15_20230702185753_0_fr_i3depoch=12.ckpt)",
+  "data": {
+    "surface_volume": "buckets/scrollprize/datasets/ink/phercparis4/w00_20231016151002/w00_20231016151002.zarr level 0 (65, 32249, 51380) uint8",
+    "labels": "w00_20231016151002_inklabels.tif + supervision_mask.tif at level-0 canvas resolution",
+    "regions": "3 ink-rich + 3 low-ink control, 2048x2048 px each at level 0"
+  },
+  "preprocessing": {
+    "frames": 26,
+    "window": "fixed layers 17..42",
+    "reverse_depth": true,
+    "note": "reverse_depth is REQUIRED for this segment family (predecessor 20231016151000 is on the GP repo reverse list). Without it AUROC drops to ~0.43-0.53 (chance). Per-tile argmax depth centering also hurts vs the fixed window.",
+    "clip_max": 200.0,
+    "scale_divisor": 255.0,
+    "tile": "64x64, stride 32; pos = supervised + >=30% ink; neg = supervised + 0 ink"
+  },
+  "overall": {
+    "n_pos": 4439,
+    "n_neg": 10052,
+    "auroc": 0.7776,
+    "mean_pos": 0.663,
+    "mean_neg": 0.3919,
+    "neg_ge_0.5": 0.3052,
+    "neg_ge_0.9": 0.0096
+  },
+  "per_region": {
+    "r0_ink_y2048_x17408":    {"auroc": 0.7859, "neg_ge_0.5": 0.2307, "neg_ge_0.9": 0.0093},
+    "r1_ink_y6144_x15360":    {"auroc": 0.8561, "neg_ge_0.5": 0.2536, "neg_ge_0.9": 0.0061},
+    "r2_ink_y2048_x9216":     {"auroc": 0.6271, "neg_ge_0.5": 0.4788, "neg_ge_0.9": 0.0304},
+    "r3_lowink_y8192_x1024":  {"auroc": 0.7760, "neg_ge_0.5": 0.3872, "neg_ge_0.9": 0.0011},
+    "r4_lowink_y6144_x10240": {"auroc": 0.8132, "neg_ge_0.5": 0.2821, "neg_ge_0.9": 0.0077},
+    "r5_lowink_y3072_x12288": {"auroc": 0.8103, "neg_ge_0.5": 0.2034, "neg_ge_0.9": 0.0069}
+  },
+  "crack_firing": {
+    "headline": "30.5% of no-ink tiles score >=0.5 but only 0.96% score >=0.9; high-confidence false firing is rare and concentrated (region r2: 3.0%)",
+    "suspects_montage": "p4_crack_suspects_l0.jpg — top no-ink firings split into (a) horizontal layer-boundary/crack bands, (b) likely unlabeled ink strokes (label noise), (c) dark blotches",
+    "near_vs_far": "firing rate modestly higher within 128px of labeled ink (label tolerance/dilation), e.g. r5: 0.279 near vs 0.185 far"
+  },
+  "figures": ["p4_scoring_hist_l0.jpg", "p4_crack_suspects_l0.jpg", "p4_benchmark_gallery.jpg"],
+  "render_pass": "surface tracer (smoothed argmax + parabolic refine + median/gaussian depth regularization) on level-1 windows; overlays in r*_*.jpg"
+}
